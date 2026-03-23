@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>2D Shooter – Levels</title>
+<style>
+body { margin:0; background:#111; color:white; text-align:center; font-family:monospace; }
+canvas { background:#222; display:block; margin:auto; border:2px solid white; }
+</style>
+</head>
+<body>
+
+<h3>
+Level: <span id="lvl">1</span> |
+HP: <span id="hp">100</span>
+</h3>
+
+<canvas id="game" width="800" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let keys = {};
+let bullets = [];
+let enemies = [];
+let level = 1;
+
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+const player = {
+  x:400, y:250, size:20,
+  hp:100, speed:4,
+  dirX:1, dirY:0,
+  lastHit:0
+};
+
+function shoot(){
+  bullets.push({
+    x:player.x, y:player.y,
+    dx:player.dirX, dy:player.dirY,
+    speed:7, damage:20, size:4
+  });
+}
+document.addEventListener("keydown", e => {
+  if(e.key===" ") shoot();
+});
+
+function spawnEnemy(type){
+  const base = { x:Math.random()*760+20, y:Math.random()*460+20 };
+  if(type==="weak") return {...base, hp:40, speed:1, type};
+  if(type==="fast") return {...base, hp:30, speed:2.5, type};
+  if(type==="tank") return {...base, hp:120, speed:0.8, type};
+  if(type==="shooter") return {...base, hp:50, speed:1.2, type, shootCooldown:0};
+}
+
+function loadLevel(){
+  enemies=[];
+  if(level===1) enemies.push(spawnEnemy("weak"), spawnEnemy("weak"));
+  if(level===2) for(let i=0;i<4;i++) enemies.push(spawnEnemy("weak"));
+  if(level===3) for(let i=0;i<2;i++) enemies.push(spawnEnemy("tank"));
+  if(level===4) for(let i=0;i<3;i++) enemies.push(spawnEnemy("shooter"));
+  if(level===5) enemies.push({x:400,y:100,hp:250,speed:1,type:"tank"});
+  if(level===6) for(let i=0;i<6;i++) enemies.push(spawnEnemy("fast"));
+  if(level===7) enemies.push(spawnEnemy("fast"),spawnEnemy("shooter"),spawnEnemy("shooter"));
+  if(level===8) for(let i=0;i<10;i++) enemies.push(spawnEnemy("weak"));
+  if(level===9) enemies.push(spawnEnemy("tank"),spawnEnemy("shooter"));
+  if(level===10){
+    enemies.push(spawnEnemy("tank"),spawnEnemy("fast"),spawnEnemy("shooter"),spawnEnemy("weak"));
+  }
+  document.getElementById("lvl").textContent = level;
+}
+
+loadLevel();
+
+function update(){
+  // Movement
+  if(keys["w"]){player.y-=player.speed; player.dirX=0; player.dirY=-1;}
+  if(keys["s"]){player.y+=player.speed; player.dirX=0; player.dirY=1;}
+  if(keys["a"]){player.x-=player.speed; player.dirX=-1; player.dirY=0;}
+  if(keys["d"]){player.x+=player.speed; player.dirX=1; player.dirY=0;}
+
+  // Bullets
+  bullets.forEach(b=>{ b.x+=b.dx*b.speed; b.y+=b.dy*b.speed; });
+  bullets = bullets.filter(b=>b.x>0&&b.x<800&&b.y>0&&b.y<500);
+
+  const now = Date.now();
+
+  enemies.forEach((e,ei)=>{
+    if(e.hp<=0) return;
+
+    // Chase
+    const dx=player.x-e.x, dy=player.y-e.y;
+    const dist=Math.hypot(dx,dy);
+    e.x+=dx/dist*e.speed;
+    e.y+=dy/dist*e.speed;
+
+    // Player damage
+    if(Math.abs(dx)<20 && Math.abs(dy)<20 && now-player.lastHit>800){
+      player.hp-=10;
+      player.lastHit=now;
+      document.getElementById("hp").textContent=player.hp;
+    }
+
+    // Bullet hit
+    bullets.forEach((b,bi)=>{
+      if(Math.abs(b.x-e.x)<15 && Math.abs(b.y-e.y)<15){
+        e.hp-=b.damage;
+        bullets.splice(bi,1);
+      }
+    });
+  });
+
+  // Level clear
+  if(enemies.every(e=>e.hp<=0)){
+    level++;
+    if(level>10){
+      alert("YOU WIN");
+      location.reload();
+    }
+    loadLevel();
+  }
+
+  if(player.hp<=0){
+    alert("GAME OVER");
+    location.reload();
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,800,500);
+
+  ctx.fillStyle="cyan";
+  ctx.fillRect(player.x-10,player.y-10,20,20);
+
+  enemies.forEach(e=>{
+    if(e.hp<=0) return;
+    ctx.fillStyle = e.type==="tank"?"darkred":
+                    e.type==="fast"?"yellow":
+                    e.type==="shooter"?"orange":"red";
+    ctx.fillRect(e.x-10,e.y-10,20,20);
+  });
+
+  ctx.fillStyle="white";
+  bullets.forEach(b=>ctx.fillRect(b.x-2,b.y-2,4,4));
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
